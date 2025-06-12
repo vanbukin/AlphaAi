@@ -1,12 +1,12 @@
 <Solution>
-  <Folder Name="/root/">
-    <File Path=".editorconfig" />
-    <File Path=".gitattributes" />
-    <File Path=".gitignore" />
-    <File Path="README.md" />
-    <File Path="global.json" />
-  </Folder>
-  <Folder Name="/root/src/">
-    <Project Path="src/AlphaAi/AlphaAi.csproj" />
-  </Folder>
+    <Folder Name="/root/">
+        <File Path=".editorconfig"/>
+        <File Path=".gitattributes"/>
+        <File Path=".gitignore"/>
+        <File Path="README.md"/>
+        <File Path="global.json"/>
+    </Folder>
+    <Folder Name="/root/src/">
+        <Project Path="src/AlphaAi/AlphaAi.csproj"/>
+    </Folder>
 </Solution>
