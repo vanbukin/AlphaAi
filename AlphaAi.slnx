@@ -5,6 +5,7 @@
         <File Path=".gitignore"/>
         <File Path="README.md"/>
         <File Path="global.json"/>
+        <File Path="AlphaAi.slnx.DotSettings"/>
     </Folder>
     <Folder Name="/root/src/">
         <Project Path="src/AlphaAi/AlphaAi.csproj"/>
