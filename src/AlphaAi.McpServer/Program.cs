@@ -35,7 +35,8 @@ public class Program
         builder.Logging.AddSimpleConsole(options =>
         {
             options.ColorBehavior = LoggerColorBehavior.Enabled;
-            options.UseUtcTimestamp = true;
+            options.UseUtcTimestamp = false;
+            options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
         });
         if (builder.Environment.IsProduction())
         {
@@ -57,7 +58,22 @@ public class Program
             builder.Services.AddHttpClient<IWebPageDownloadService, DefaultWebPageDownloadService>()
                 .ConfigureHttpClient((_, httpClient) =>
                 {
+                    httpClient.DefaultRequestHeaders.Clear();
+                    httpClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
+                    httpClient.DefaultRequestHeaders.Add("sec-ch-ua", "\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"");
+                    httpClient.DefaultRequestHeaders.Add("sec-ch-ua-mobile", "?0");
+                    httpClient.DefaultRequestHeaders.Add("sec-ch-ua-platform", "\"Windows\"");
+                    httpClient.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
+                    httpClient.DefaultRequestHeaders.Add("DNT", "1");
                     httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36");
+                    httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+                    httpClient.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
+                    httpClient.DefaultRequestHeaders.Add("Sec-Fetch-Mode", "navigate");
+                    httpClient.DefaultRequestHeaders.Add("Sec-Fetch-User", "?1");
+                    httpClient.DefaultRequestHeaders.Add("Sec-Fetch-Dest", "document");
+                    httpClient.DefaultRequestHeaders.Add("Referer", "https://www.google.com/");
+                    httpClient.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br, zstd");
+                    httpClient.DefaultRequestHeaders.Add("Accept-Language", "ru,en-US;q=0.9,en;q=0.8");
                 });
             builder.Services.AddSingleton(new DefaultYandexSearchServiceOptions(config.YandexSearch.FolderId));
             builder.Services.AddScoped<IYandexSearchService, DefaultYandexSearchService>();

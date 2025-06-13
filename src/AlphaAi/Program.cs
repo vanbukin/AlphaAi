@@ -56,8 +56,8 @@ public class Program
         builder.Logging.AddSimpleConsole(options =>
         {
             options.ColorBehavior = LoggerColorBehavior.Enabled;
-            options.UseUtcTimestamp = true;
-            options.IncludeScopes = true;
+            options.UseUtcTimestamp = false;
+            options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
         });
         if (builder.Environment.IsProduction())
         {
