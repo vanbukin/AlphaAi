@@ -1,41 +1,32 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using AlphaAi.Configuration.Options;
+using AlphaAi.Configuration.TypedConfigurations.Llm;
+using AlphaAi.Configuration.TypedConfigurations.Telegram;
 
 namespace AlphaAi.Configuration.TypedConfigurations;
 
 [SuppressMessage("Maintainability", "CA1515:Consider making public types internal")]
 public class ApplicationConfiguration
 {
-    private ApplicationConfiguration(string telegramBotToken, IReadOnlySet<long> allowedChatIds)
+    public ApplicationConfiguration(TelegramConfiguration telegram, LlmConfiguration llm)
     {
-        if (string.IsNullOrEmpty(telegramBotToken))
-        {
-            throw new ArgumentException("Value cannot be null or empty.", nameof(telegramBotToken));
-        }
-
-        ArgumentNullException.ThrowIfNull(allowedChatIds);
-        if ((allowedChatIds.Count > 0) is not true)
-        {
-            throw new ArgumentException("Value sshould contain at least 1 element", nameof(allowedChatIds));
-        }
-
-        TelegramBotToken = telegramBotToken;
-        AllowedChatIds = allowedChatIds;
+        ArgumentNullException.ThrowIfNull(telegram);
+        ArgumentNullException.ThrowIfNull(llm);
+        Telegram = telegram;
+        Llm = llm;
     }
 
-    public string TelegramBotToken { get; }
-
-    public IReadOnlySet<long> AllowedChatIds { get; }
+    public TelegramConfiguration Telegram { get; }
+    public LlmConfiguration Llm { get; }
 
     public static ApplicationConfiguration Convert(ApplicationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var uniqueChatIds = options.AllowedChatIds.ToHashSet();
+        var telegram = TelegramConfiguration.Convert(options.Telegram);
+        var llm = LlmConfiguration.Convert(options.Llm);
         return new(
-            options.TelegramBotToken,
-            uniqueChatIds);
+            telegram,
+            llm);
     }
 }
