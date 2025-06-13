@@ -10,13 +10,15 @@ public class LlmConfiguration
         string apiKey,
         string model,
         string botName,
-        LlmTokensConfiguration tokens)
+        LlmTokensConfiguration tokens,
+        LlmMcpConfiguration mcp)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(botName);
         ArgumentNullException.ThrowIfNull(tokens);
+        ArgumentNullException.ThrowIfNull(mcp);
         if (string.IsNullOrEmpty(apiKey))
         {
             throw new ArgumentException("Value cannot be null or empty.", nameof(apiKey));
@@ -37,6 +39,7 @@ public class LlmConfiguration
         Model = model;
         BotName = botName;
         Tokens = tokens;
+        Mcp = mcp;
     }
 
     public Uri Endpoint { get; }
@@ -44,6 +47,7 @@ public class LlmConfiguration
     public string Model { get; }
     public string BotName { get; }
     public LlmTokensConfiguration Tokens { get; }
+    public LlmMcpConfiguration Mcp { get; }
 
     public static LlmConfiguration Convert(LlmOptions options)
     {
@@ -54,7 +58,14 @@ public class LlmConfiguration
         }
 
         var tokens = LlmTokensConfiguration.Convert(options.Tokens);
+        var mcp = LlmMcpConfiguration.Convert(options.Mcp);
 
-        return new(typedEndpoint, options.ApiKey, options.Model, options.BotName, tokens);
+        return new(
+            typedEndpoint,
+            options.ApiKey,
+            options.Model,
+            options.BotName,
+            tokens,
+            mcp);
     }
 }

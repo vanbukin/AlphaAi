@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace AlphaAi.Extensions.Configuration;
+namespace AlphaAi.Infrastructure.Extensions.Configuration;
 
 public static class TypedConfigurationExtensions
 {

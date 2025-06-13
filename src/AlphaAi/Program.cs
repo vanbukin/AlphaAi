@@ -11,13 +11,17 @@ using AlphaAi.Commands.DisplayHelp;
 using AlphaAi.Commands.ResetLlmContext;
 using AlphaAi.Configuration.Options;
 using AlphaAi.Configuration.TypedConfigurations;
-using AlphaAi.Extensions.Configuration;
+using AlphaAi.Infrastructure.Extensions.Configuration;
 using AlphaAi.Services.CommandDispatcher;
 using AlphaAi.Services.CommandDispatcher.Implementation;
 using AlphaAi.Services.Llm.Chat;
 using AlphaAi.Services.Llm.Chat.Implementation;
 using AlphaAi.Services.Llm.ChatClientFactory;
 using AlphaAi.Services.Llm.ChatClientFactory.Implementation;
+using AlphaAi.Services.Llm.McpClientFactory;
+using AlphaAi.Services.Llm.McpClientFactory.Implementation;
+using AlphaAi.Services.Llm.McpTools;
+using AlphaAi.Services.Llm.McpTools.Implementation;
 using AlphaAi.Services.Telegram.RequestHandler;
 using AlphaAi.Services.Telegram.RequestHandler.Implementation;
 using AlphaAi.Services.Telegram.SelfProvider;
@@ -28,6 +32,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using ModelContextProtocol.Client;
 using Telegram.Bot;
 
 namespace AlphaAi;
@@ -117,6 +122,14 @@ public class Program
             builder.Services.AddHostedService<LlmRequestsBackgroundService>();
             // Infrastructure
             builder.Services.AddSingleton(TimeProvider.System);
+            // MCP
+            if (config.Llm.Mcp.Enabled)
+            {
+                builder.Services.AddSingleton(new DefaultMcpClientFactoryOptions(config.Llm.Mcp.Endpoint));
+                builder.Services.AddSingleton<IMcpClientFactory, DefaultMcpClientFactory>();
+            }
+
+            builder.Services.AddSingleton<IMcpToolsStorage, DefaultMcpToolsStorage>();
             // Start host
             using (var host = builder.Build())
             {
@@ -131,8 +144,28 @@ public class Program
                     var botClient = host.Services.GetRequiredService<TelegramBotClient>();
                     botClient.OnMessage += requestHandler.OnMessageAsync;
                     botClient.OnError += requestHandler.OnErrorAsync;
+                    IMcpClient? mcpClient = null;
+                    if (config.Llm.Mcp.Enabled)
+                    {
+                        programLogger.LogInformation("MCP enabled. Initializing MCP client");
+                        var mcpClientFactory = host.Services.GetRequiredService<IMcpClientFactory>();
+                        var mcpToolsStorage = host.Services.GetRequiredService<IMcpToolsStorage>();
+                        mcpClient = await mcpClientFactory.CreateAsync(CancellationToken.None);
+                        var tools = await mcpClient.ListToolsAsync();
+                        mcpToolsStorage.SetTools(tools);
+                        programLogger.LogInformation("MCP client initialized");
+                    }
+                    else
+                    {
+                        programLogger.LogInformation("MCP disabled");
+                    }
+
                     programLogger.LogInformation("Initialization complete");
                     await host.RunAsync(CancellationToken.None);
+                    if (mcpClient is not null)
+                    {
+                        await mcpClient.DisposeAsync();
+                    }
                 }
                 catch (Exception ex)
                 {

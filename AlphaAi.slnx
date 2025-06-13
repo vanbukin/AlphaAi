@@ -9,5 +9,7 @@
     </Folder>
     <Folder Name="/root/src/">
         <Project Path="src/AlphaAi/AlphaAi.csproj"/>
+        <Project Path="src\AlphaAi.Infrastructure\AlphaAi.Infrastructure.csproj" Type="Classic C#"/>
+        <Project Path="src\AlphaAi.McpServer\AlphaAi.McpServer.csproj" Type="Classic C#"/>
     </Folder>
 </Solution>

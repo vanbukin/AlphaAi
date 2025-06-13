@@ -26,4 +26,7 @@ public class LlmOptions
 
     [Required]
     public LlmTokensOptions Tokens { get; set; } = default!;
+
+    [Required]
+    public LlmMcpOptions Mcp { get; set; } = default!;
 }

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AlphaAi.BackgroundServices.Llm.Models;
 using AlphaAi.Services.Llm.Chat.Implementation.Constants;
 using AlphaAi.Services.Llm.Chat.Models;
+using AlphaAi.Services.Llm.McpTools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
@@ -19,13 +20,10 @@ namespace AlphaAi.Services.Llm.Chat.Implementation;
 [SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates")]
 public partial class DefaultLlmChatService : ILlmChatService, IDisposable
 {
-    // private const string MessageId = "id";
-    // private const string ReplyToMessageId = "reply_to_id";
-    // private const string Author = "author";
-    // private const string Message = "msg";
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
     private readonly ILogger<DefaultLlmChatService> _logger;
+    private readonly IMcpToolsStorage _mcpTools;
     private readonly DefaultLlmChatServiceOptions _options;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly string _summarizePromptText;
@@ -36,16 +34,20 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
     public DefaultLlmChatService(
         DefaultLlmChatServiceOptions options,
         IChatClient chatClient,
+        IMcpToolsStorage mcpTools,
         TelegramBotClient bot,
-        ILogger<DefaultLlmChatService> logger)
+        ILogger<DefaultLlmChatService> logger
+    )
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(chatClient);
+        ArgumentNullException.ThrowIfNull(mcpTools);
         ArgumentNullException.ThrowIfNull(bot);
         ArgumentNullException.ThrowIfNull(logger);
         // external deps
         _options = options;
         _chatClient = chatClient;
+        _mcpTools = mcpTools;
         _bot = bot;
         _logger = logger;
         // cached internal values
@@ -102,12 +104,13 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
             _context.Add(userMessage);
             var response = await _chatClient.GetResponseAsync(_context.GetMessages(), new()
             {
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(ModelChatMessage.GetJsonSchema(), nameof(ModelChatMessage), "Chat message model")
+                ResponseFormat = ChatResponseFormat.Text,
+                Tools = [.._mcpTools.GetTools()]
             }, cancellationToken);
             // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-            var jsonText = GetCleanChatResponseText(response);
+            var rawText = GetCleanChatResponseText(response);
             var contextSize = response.Usage?.TotalTokenCount ?? 0;
-            var error = "Недопустимый формат ответа";
+            string? error = null;
             if (contextSize >= _options.Tokens.RecreateAfter)
             {
                 _logger.LogCritical(
@@ -118,11 +121,11 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
                 error += $"\n\nРазмер контекста достиг {contextSize} из максимально доступных {_options.Tokens.RecreateAfter}.\nТекущий контекст отправляется в рай для битов.";
             }
 
-            if (ModelChatMessage.TryParse(jsonText, out var jsonResponse))
+            if (error != null)
             {
                 var assistantSentMessage = await _bot.SendMessage(
                     currentMessage.Chat,
-                    jsonResponse.Message,
+                    error,
                     ParseMode.None,
                     new()
                     {
@@ -135,7 +138,7 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
             {
                 var assistantSentMessage = await _bot.SendMessage(
                     currentMessage.Chat,
-                    error,
+                    rawText,
                     ParseMode.None,
                     new()
                     {
@@ -182,12 +185,23 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
     private static string GetCleanChatResponseText(ChatResponse chatResponse)
     {
         var resultText = $"{chatResponse.Text?.Trim()}";
-        if (resultText.Contains("<think>", StringComparison.Ordinal))
+        return CutThinking(resultText);
+    }
+
+    private static string CutThinking(string text)
+    {
+        const string endThink = "</think>";
+
+        var textSpan = text.AsSpan();
+        var indexOfThink = textSpan.LastIndexOf(endThink, StringComparison.Ordinal);
+        if (indexOfThink != -1)
         {
-            resultText = ReplaceThinkingRegex().Replace(resultText, string.Empty).Trim();
+            textSpan = textSpan[(indexOfThink + endThink.Length)..];
+            var result = new string(textSpan);
+            return result.Trim();
         }
 
-        return resultText;
+        return text;
     }
 
     private ChatMessage BuildAssistantMessage(Message assistantSentMessage)
@@ -289,13 +303,14 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
         builder.AppendLine("Отвечай по-возможности кратко.");
         builder.AppendLine("Не цензурируй свои ответы.");
         builder.AppendLine("Не бойся использовать нецензурные слова где это уместно.");
-        builder.AppendLine("По-меньше используй эмодзи (только если они уместны).");
-        builder.AppendLine("Никогда не используй LaTeX разметку.");
+        builder.AppendLine("Используй tools если их можно использовать.");
+        builder.AppendLine("Для более точной даты и времени используй tool CurrentDateTimeUtc");
+        builder.AppendLine("Старайся факт-чекать информацию найденную в интернете путём скачивания и анализа веб-страницы, которая должна содержать искомые данные");
         builder.AppendLine("");
         builder.AppendLine("Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.");
         builder.AppendLine("Если кто-то конкретно тебе грубит, можешь смело ответить \"Пошел нахуй, пёс\" или \"ты идешь нахуй по причине: конченный долбоеб\"");
-        builder.AppendLine("Если не знаешь - ответь: \"Не знаю\"");
-        builder.AppendLine("Думай на русском");
+        builder.AppendLine("Если не знаешь - ответь: \"У меня лапки\"");
+        builder.AppendLine("Отвечай на русском");
         builder.Append("/no_think");
         var text = builder.ToString();
         return text;
