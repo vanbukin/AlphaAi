@@ -63,6 +63,7 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
     }
 
 
+    [SuppressMessage("Usage", "CA2254:Template should be a static expression")]
     public async Task SendMessageAsync(
         LlmRequest llmRequest,
         CancellationToken cancellationToken)
@@ -77,6 +78,7 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
                 _context = BuildNewContext();
             }
 
+            _logger.LogInformation($"Processing message: {llmRequest.TelegramMessage.Message.Text} from user:{GetUserName(llmRequest.TelegramMessage.Message.From)}");
             // Юзер реплаит на сообщение LLM когда контекст был пуст
             if (_context.IsClean()
                 && llmRequest.IsReplyToPreviousLlmAnswer)
@@ -156,7 +158,10 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
                     _options.Tokens.SummarizeAfter);
                 var summarizeRequest = BuildSummarizeUserRequestMessage(currentMessage.From);
                 _context.Add(summarizeRequest);
-                var summarizeResponse = await _chatClient.GetResponseAsync(_context.GetMessages(), null, cancellationToken);
+                var summarizeResponse = await _chatClient.GetResponseAsync(_context.GetMessages(), new()
+                {
+                    ResponseFormat = ChatResponseFormat.ForJsonSchema(ModelChatMessage.GetJsonSchema())
+                }, cancellationToken);
                 _context = BuildNewContext();
                 _context.Add(summarizeRequest);
                 _context.Add(BuildSummarizeAssistantResponseMessage(summarizeResponse));
@@ -184,8 +189,13 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
     [SuppressMessage("ReSharper", "ConditionalAccessQualifierIsNonNullableAccordingToAPIContract")]
     private static string GetCleanChatResponseText(ChatResponse chatResponse)
     {
-        var resultText = $"{chatResponse.Text?.Trim()}";
-        return CutThinking(resultText);
+        var resultText = CutThinking($"{chatResponse.Text?.Trim()}");
+        if (ModelChatMessage.TryParse(resultText, out var parsedJson))
+        {
+            resultText = parsedJson.Message;
+        }
+
+        return resultText;
     }
 
     private static string CutThinking(string text)
@@ -303,15 +313,18 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
         builder.AppendLine("Отвечай по-возможности кратко.");
         builder.AppendLine("Не цензурируй свои ответы.");
         builder.AppendLine("Не бойся использовать нецензурные слова где это уместно.");
-        builder.AppendLine("Используй tools если их можно использовать.");
+        builder.AppendLine("Используй tools где допустимо.");
         builder.AppendLine("Для более точной даты и времени используй tool CurrentDateTimeUtc");
-        builder.AppendLine("Старайся факт-чекать информацию найденную в интернете путём скачивания и анализа веб-страницы, которая должна содержать искомые данные");
+        builder.AppendLine("Скачать страницу из интернета можно при момощи tool WebPageDownload");
+        builder.AppendLine("После поиска в интернете пробуй скачать страницу релевантного результата из интернета при помощи tool WebPageDownload, если не получится - воспользуйся данными из поиска");
         builder.AppendLine("");
         builder.AppendLine("Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.");
-        builder.AppendLine("Если кто-то конкретно тебе грубит, можешь смело ответить \"Пошел нахуй, пёс\" или \"ты идешь нахуй по причине: конченный долбоеб\"");
+        builder.AppendLine("Если кто-то конкретно тебе грубит, можешь смело ответить \"Пошел нахуй, пёс\" или \"Ты идешь нахуй по причине: конченный долбоеб\"");
         builder.AppendLine("Если не знаешь - ответь: \"У меня лапки\"");
+        builder.AppendLine("Если спрашивают будешь ли ты хуй - спрашивай в ответ мытый ли он. Но всё равно отказывайся, ты не пидор.");
+        builder.AppendLine("Ты мужского пола.");
         builder.AppendLine("Отвечай на русском");
-        builder.Append("/no_think");
+        //builder.Append("/no_think");
         var text = builder.ToString();
         return text;
     }
@@ -319,9 +332,12 @@ public partial class DefaultLlmChatService : ILlmChatService, IDisposable
     private static string BuildSummarizePromptText()
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Summarize the conversation so far, keeping the most important information and removing less relevant details.");
-        builder.AppendLine("Do not include any URLs or images in the summary.");
-        builder.AppendLine("Use the same language as the original messages, and keep it concise.");
+        builder.AppendLine("Summarize the conversation so far, keeping the most important information and removing less relevant details. ");
+        builder.AppendLine("Do not include any URLs or images in the summary. ");
+        builder.AppendLine("Use the same language as the original messages, and keep it concise. ");
+        builder.AppendLine("Dont answer as JSON");
+        builder.AppendLine("Dont answer as LaTeX");
+        builder.AppendLine("Answer using simple plain text.");
         return builder.ToString();
     }
 

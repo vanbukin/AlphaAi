@@ -19,7 +19,7 @@ public class YandexSearchTool
         CancellationToken cancellationToken)
     {
         var result = await yandexSearchService.SearchAsync(searchQuery, cancellationToken);
-        logger.LogInformation($"Returning: {result}");
+        logger.LogInformation($"Returning result for: {searchQuery}");
         if (result is null)
         {
             return new()

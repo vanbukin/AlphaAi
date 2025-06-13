@@ -21,10 +21,10 @@ public class WebPageDownloadTool
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    [McpServerTool(Name = "Internet document download using HTTP GET request")]
-    [Description("Realtime internet document download. Returns result as string.")]
+    [McpServerTool(Name = "WebPageDownload")]
+    [Description("Realtime http:// or https:// HTML download. Returns result as string.")]
     public static async Task<Content> WebPageDownload(
-        [Description("Web page address. Url with http:// or https:// scheme.")]
+        [Description("Url with http:// or https:// scheme.")]
         string webPageAddress,
         IWebPageDownloadService webPageDownloadService,
         ILogger<WebPageDownloadTool> logger,
@@ -38,7 +38,7 @@ public class WebPageDownloadTool
                 using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken))
                 {
                     var result = await webPageDownloadService.DownloadWebPageAsync(webPageAddress, linkedCts.Token);
-                    logger.LogInformation($"Downloaded web page: {result}");
+                    logger.LogInformation($"Downloaded web page: {webPageAddress}");
                     return new()
                     {
                         Annotations = new()
